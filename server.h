@@ -5,12 +5,18 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include <boost/asio.hpp>
 #include "session.h"
+
+namespace net = boost::asio;
+namespace sys = boost::system;
+using tcp = boost::asio::ip::tcp;
 
 /*
  * The class is responsible for accepting connections
  */
 class server {
+
     net::io_context& ioc_;
     net::signal_set signals_;
     tcp::acceptor acceptor_;
