@@ -1,9 +1,17 @@
-#include <boost/lexical_cast.hpp>
+#include <charconv>
+#include <string_view>
 #include "server.h"
 
 void print_usage() {
-    cout << "Usage: \n\tport_forwarder <listen_port> <destination_host> <destination_port>\n";
-    cout << "Example: \n\ttcp_port_forwarder 2000 127.0.0.1 22\n";
+    std::cout << "Usage: \n\tport_forwarder <listen_port> <destination_host> <destination_port>\n";
+    std::cout << "Example: \n\ttcp_port_forwarder 2000 127.0.0.1 22\n";
+}
+
+std::uint16_t get_port_from_cmd_line(const char* arg) {
+    std::uint16_t number{0};
+    std::string_view arg_str{arg};
+    std::from_chars(arg_str.begin(), arg_str.end(), number);
+    return number;
 }
 
 int main(int argc, char* argv[])
@@ -13,14 +21,18 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    uint16_t src_port{0}, dst_port{0};
-    try {
-        src_port = boost::lexical_cast<uint16_t>(argv[1]);
-        dst_port = boost::lexical_cast<uint16_t>(argv[3]);
-    } catch (const boost::bad_lexical_cast::exception& ex) {
-        cerr << "Invalid program arguments\n";
+    uint16_t src_port = get_port_from_cmd_line(argv[1]);
+    if (!src_port) {
+        cerr << "Invalid listen_port argument\n";
         print_usage();
-        return -1;
+        return 0;
+    }
+
+    uint16_t dst_port = get_port_from_cmd_line(argv[3]);
+    if (!dst_port) {
+        cerr << "Invalid destination_port argument\n";
+        print_usage();
+        return 0;
     }
 
     try {
