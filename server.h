@@ -14,12 +14,14 @@ class server {
     net::io_context& ioc_;
     net::signal_set signals_;
     tcp::acceptor acceptor_;
-    string dst_host_;
-    uint16_t dst_port_;
+    std::string remote_host_;
+    std::string remote_service_;
+
 public:
-    server(net::io_context& ioc, uint16_t listen_port, const string& dst_host, uint16_t dest_port)
-            : ioc_(ioc), signals_(ioc), acceptor_(ioc, tcp::endpoint(tcp::v4(), listen_port)),
-              dst_host_(dst_host), dst_port_(dest_port)
+    server(net::io_context& ioc, std::uint16_t listen_port,
+           const std::string_view& remote_host, const std::string_view& remote_service)
+        : ioc_(ioc), signals_(ioc), acceptor_(ioc, tcp::endpoint(tcp::v4(), listen_port)),
+          remote_host_(remote_host), remote_service_(remote_service)
     {
         configure_signals();
         start_wait_signals();
@@ -28,43 +30,37 @@ public:
     }
 
     void start_accept() {
-        auto new_session = session::create(ioc_, dst_host_, dst_port_);
+        auto new_session = session::create(ioc_, remote_host_, remote_service_);
 
-        acceptor_.async_accept(new_session->socket(),
-                               boost::bind(&server::handle_accept, this,
-                                           new_session,
-                                           net::placeholders::error));
+        acceptor_.async_accept(
+            new_session->socket(),
+            [this, new_session](const sys::error_code& ec) {
+                if (!ec) {
+                    new_session->start();
+                } else {
+                    std::cout << ec.message() << std::endl;
+                }
+
+                start_accept();
+            });
     }
 
 private:
     void configure_signals() {
         signals_.add(SIGINT);
         signals_.add(SIGTERM);
-#if defined(SIGQUIT)
         signals_.add(SIGQUIT);
-#endif
     }
 
     void start_wait_signals() {
         signals_.async_wait(
-                [this](const sys::error_code& ec, int /*signo*/)
-                {
-                    if (ec) {
-                        cout << ec.message() << endl;
-                    }
-                    acceptor_.close();
-                    ioc_.stop();
-                });
-    }
-
-    void handle_accept(const boost::shared_ptr<session>& new_session, const sys::error_code& ec) {
-        if (!ec) {
-            new_session->start();
-        } else {
-            cout << ec.message() << endl;
-        }
-
-        start_accept();
+            [this](const sys::error_code& ec, int /*signo*/) {
+                if (ec) {
+                    std::cout << ec.message() << std::endl;
+                }
+                acceptor_.close();
+                ioc_.stop();
+            });
     }
 };
 #endif //SERVER_H
